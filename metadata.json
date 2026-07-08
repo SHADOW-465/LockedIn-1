@@ -1,0 +1,6 @@
+{
+  "name": "LOCKEDIN-X",
+  "description": "A premium personal discipline operating system with AI companion, daily rituals, verification, and a living memoir.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
