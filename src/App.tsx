@@ -316,6 +316,30 @@ export default function App() {
     setActiveTab("dashboard");
   };
 
+  const handleImportData = (newProfile: UserProfile, newEntries: DailyEntry[], newUrges: UrgeEvent[], newMessages: ChatMessage[]) => {
+    getLocalStorage.saveUserProfile(newProfile);
+    getLocalStorage.saveDailyEntries(newEntries);
+    getLocalStorage.saveUrges(newUrges);
+    getLocalStorage.saveChatMessages(newMessages);
+    
+    // Also mark onboarding completed
+    const ob = getLocalStorage.getOnboardingState();
+    const updatedOb = { 
+      ...ob, 
+      completed: true, 
+      name: newProfile.name, 
+      commitment: newProfile.commitment,
+      targetGoalDays: newProfile.targetGoalDays || 30 
+    };
+    getLocalStorage.saveOnboardingState(updatedOb);
+    setOnboarding(updatedOb);
+
+    setProfile(newProfile);
+    setEntries(newEntries);
+    setUrges(newUrges);
+    setMessages(newMessages);
+  };
+
   const handleExportData = () => {
     if (!profile) return;
     // Generate autobiography markdown
@@ -398,9 +422,13 @@ export default function App() {
           <Profile
             profile={profile!}
             milestones={milestones}
+            entries={entries}
+            urges={urges}
+            messages={messages}
             onUpdateProfile={handleUpdateProfile}
             onResetAll={handleResetAll}
             onExportData={handleExportData}
+            onImportData={handleImportData}
           />
         )}
       </main>

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="128" fill="#09090b"/>
+  <!-- Glowing lock & X combination in neon lime-green -->
+  <g transform="translate(106, 106)">
+    <!-- Shield/Lock body -->
+    <path d="M150 40 L60 80 L60 180 C60 260 150 320 150 320 C150 320 240 260 240 180 L240 80 Z" fill="none" stroke="#ccff00" stroke-width="24" stroke-linejoin="round" stroke-linecap="round"/>
+    <!-- Stylized X in the center -->
+    <path d="M110 130 L190 210 M190 130 L110 210" stroke="#ccff00" stroke-width="28" stroke-linecap="round"/>
+  </g>
+</svg>

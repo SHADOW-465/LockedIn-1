@@ -1,0 +1,15 @@
+{
+  "appId": "com.lockedinx.disciplineos",
+  "appName": "LOCKEDIN-X Discipline OS",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "plugins": {
+    "CapacitorSQLite": {
+      "iosDatabaseLocation": "Library/CapacitorDatabase",
+      "androidDatabaseLocation": "databases"
+    },
+    "Filesystem": {
+      "androidStorage": "locked_in_x_data"
+    }
+  }
+}
