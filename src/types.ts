@@ -83,3 +83,17 @@ export interface OnboardingState {
   completed: boolean;
   targetGoalDays: number;
 }
+
+export interface RemovalRecord {
+  id: string;
+  timestamp: string; // ISO string
+  purpose: string; // e.g., "Hygiene", "Medical", "Security check"
+}
+
+export interface PhysicalTracking {
+  cageTouches: number;
+  unlockUrges: number;
+  tingleStrokes: number;
+  cageRemovals: RemovalRecord[];
+}
+

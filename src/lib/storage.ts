@@ -1,4 +1,4 @@
-import { UserProfile, DailyEntry, UrgeEvent, Milestone, ChatMessage, OnboardingState } from "../types";
+import { UserProfile, DailyEntry, UrgeEvent, Milestone, ChatMessage, OnboardingState, PhysicalTracking, RemovalRecord } from "../types";
 
 const KEYS = {
   USER_PROFILE: "lockedinx_user_profile",
@@ -7,6 +7,7 @@ const KEYS = {
   MILESTONES: "lockedinx_milestones",
   CHAT_MESSAGES: "lockedinx_chat_messages",
   ONBOARDING: "lockedinx_onboarding",
+  PHYSICAL_TRACKING: "lockedinx_physical_tracking",
 };
 
 // Default milestones to seed
@@ -251,6 +252,25 @@ export const getLocalStorage = {
 
   saveOnboardingState: (state: OnboardingState) => {
     localStorage.setItem(KEYS.ONBOARDING, JSON.stringify(state));
+  },
+
+  getPhysicalTracking: (): PhysicalTracking => {
+    const data = localStorage.getItem(KEYS.PHYSICAL_TRACKING);
+    if (!data) {
+      const defaultTracking: PhysicalTracking = {
+        cageTouches: 0,
+        unlockUrges: 0,
+        tingleStrokes: 0,
+        cageRemovals: [],
+      };
+      localStorage.setItem(KEYS.PHYSICAL_TRACKING, JSON.stringify(defaultTracking));
+      return defaultTracking;
+    }
+    return JSON.parse(data);
+  },
+
+  savePhysicalTracking: (tracking: PhysicalTracking) => {
+    localStorage.setItem(KEYS.PHYSICAL_TRACKING, JSON.stringify(tracking));
   },
 
   resetAll: () => {

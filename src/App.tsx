@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { getLocalStorage } from "./lib/storage";
-import { UserProfile, DailyEntry, Milestone, ChatMessage, OnboardingState, UrgeEvent } from "./types";
+import { UserProfile, DailyEntry, Milestone, ChatMessage, OnboardingState, UrgeEvent, PhysicalTracking } from "./types";
 import Onboarding from "./components/Onboarding";
 import Dashboard from "./components/Dashboard";
 import Timeline from "./components/Timeline";
@@ -20,6 +20,7 @@ export default function App() {
   const [urges, setUrges] = useState<UrgeEvent[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [physicalTracking, setPhysicalTracking] = useState<PhysicalTracking | null>(null);
   
   // Navigation
   const [activeTab, setActiveTab] = useState<string>("dashboard");
@@ -37,6 +38,7 @@ export default function App() {
       setUrges(getLocalStorage.getUrges());
       setMilestones(getLocalStorage.getMilestones());
       setMessages(getLocalStorage.getChatMessages());
+      setPhysicalTracking(getLocalStorage.getPhysicalTracking());
     }
   }, []);
 
@@ -167,6 +169,9 @@ export default function App() {
 
     const seededMessages = getLocalStorage.getChatMessages();
     setMessages(seededMessages);
+
+    const seededTracking = getLocalStorage.getPhysicalTracking();
+    setPhysicalTracking(seededTracking);
   };
 
   const handleUpdateProfile = (updates: Partial<UserProfile>) => {
@@ -313,6 +318,12 @@ export default function App() {
     setUrges([]);
     setMilestones([]);
     setMessages([]);
+    setPhysicalTracking({
+      cageTouches: 0,
+      unlockUrges: 0,
+      tingleStrokes: 0,
+      cageRemovals: []
+    });
     setActiveTab("dashboard");
   };
 
@@ -370,6 +381,11 @@ export default function App() {
     document.body.removeChild(a);
   };
 
+  const handleUpdatePhysicalTracking = (updated: PhysicalTracking) => {
+    setPhysicalTracking(updated);
+    getLocalStorage.savePhysicalTracking(updated);
+  };
+
   // 4. Return Loading or Onboarding
   if (!onboarding) {
     return (
@@ -385,6 +401,13 @@ export default function App() {
 
   const todayDateStr = new Date().toISOString().split("T")[0];
   const todayEntry = entries.find((e) => e.date === todayDateStr);
+
+  const defaultPhysicalTracking: PhysicalTracking = {
+    cageTouches: 0,
+    unlockUrges: 0,
+    tingleStrokes: 0,
+    cageRemovals: []
+  };
 
   return (
     <div className="min-h-screen bg-black text-[#f1f1f1] flex flex-col relative font-sans">
@@ -403,6 +426,9 @@ export default function App() {
             onStartRitual={(type) => setActiveRitual(type)}
             onTriggerSupport={() => setSupportActive(true)}
             onNavigateToTab={(tab) => setActiveTab(tab)}
+            onboarding={onboarding!}
+            physicalTracking={physicalTracking || defaultPhysicalTracking}
+            onUpdatePhysicalTracking={handleUpdatePhysicalTracking}
           />
         )}
         {activeTab === "timeline" && (

@@ -1,7 +1,17 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Calendar as CalendarIcon, CheckCircle2, Clock, BookOpen, ChevronLeft, ChevronRight, Eye, Star, ShieldAlert } from "lucide-react";
+import { Calendar as CalendarIcon, CheckCircle2, Clock, BookOpen, ChevronLeft, ChevronRight, Eye, Star, ShieldAlert, Activity } from "lucide-react";
 import { DailyEntry, UserProfile, UrgeEvent } from "../types";
+
+export interface HeatmapDay {
+  dateStr: string;
+  dayOfWeek: number;
+  monthLabel: string;
+  urges: UrgeEvent[];
+  urgeScore: number;
+  maxIntensity: number;
+  entry?: DailyEntry;
+}
 
 interface TimelineProps {
   entries: DailyEntry[];
@@ -12,6 +22,61 @@ interface TimelineProps {
 export default function Timeline({ entries, urges, profile }: TimelineProps) {
   const [activeTab, setActiveTab] = useState<"today" | "history">("today");
   const [selectedEntry, setSelectedEntry] = useState<DailyEntry | null>(null);
+
+  // Generate 12-week heatmap data ending today
+  const heatmapWeeks = useMemo(() => {
+    const weeks: HeatmapDay[][] = [];
+    const now = new Date();
+    const currentDayOfWeek = now.getDay();
+    
+    // Sunday of 11 weeks ago
+    const currentSunday = new Date(now);
+    currentSunday.setDate(now.getDate() - currentDayOfWeek);
+    
+    const startDate = new Date(currentSunday);
+    startDate.setDate(currentSunday.getDate() - 11 * 7);
+    
+    let iterDate = new Date(startDate);
+    for (let w = 0; w < 12; w++) {
+      const weekDays: HeatmapDay[] = [];
+      for (let d = 0; d < 7; d++) {
+        const dateStr = iterDate.toISOString().split("T")[0];
+        const dayOfWeek = iterDate.getDay();
+        const monthLabel = iterDate.toLocaleDateString("en-US", { month: "short" });
+        
+        const dayUrges = urges.filter((u) => {
+          const uDate = u.timestamp.split("T")[0];
+          return uDate === dateStr;
+        });
+        
+        const urgeScore = dayUrges.reduce((sum, u) => sum + u.intensity, 0);
+        const maxIntensity = dayUrges.length > 0 ? Math.max(...dayUrges.map(u => u.intensity)) : 0;
+        const entry = entries.find((e) => e.date === dateStr);
+        
+        weekDays.push({
+          dateStr,
+          dayOfWeek,
+          monthLabel,
+          urges: dayUrges,
+          urgeScore,
+          maxIntensity,
+          entry
+        });
+        
+        iterDate.setDate(iterDate.getDate() + 1);
+      }
+      weeks.push(weekDays);
+    }
+    return weeks;
+  }, [urges, entries]);
+
+  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const defaultSelectedDay = useMemo(() => {
+    const flat = heatmapWeeks.flat();
+    return flat.find(d => d.dateStr === todayStr) || flat[flat.length - 1];
+  }, [heatmapWeeks, todayStr]);
+
+  const [selectedHeatmapDay, setSelectedHeatmapDay] = useState<HeatmapDay | null>(defaultSelectedDay || null);
 
   // Sorted entries desc
   const sortedEntries = [...entries].sort((a, b) => b.dayNumber - a.dayNumber);
@@ -219,6 +284,233 @@ export default function Timeline({ entries, urges, profile }: TimelineProps) {
             exit={{ opacity: 0, y: -10 }}
             className="space-y-6"
           >
+            {/* Daily Urge Heatmap Calendar */}
+            <div className="bg-zinc-950 border border-zinc-900 rounded-[28px] p-6 space-y-6">
+              <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-rose-500 animate-pulse" />
+                  <div>
+                    <h2 className="text-sm font-bold text-white font-mono">Daily Urge Heatmap Calendar</h2>
+                    <p className="text-[10px] text-zinc-500 font-mono">Intensity & frequency of urge encounters</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-400 bg-zinc-900 border border-zinc-800 px-2.5 py-0.5 rounded-full">
+                  <span>90-Day Reboot Range</span>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {/* Month Labels */}
+                <div className="grid grid-cols-12 gap-1 mb-1 pl-6 select-none">
+                  {heatmapWeeks.map((week, idx) => {
+                    const showLabel = idx === 0 || heatmapWeeks[idx - 1][0].monthLabel !== week[0].monthLabel;
+                    return (
+                      <div key={`month-lbl-${idx}`} className="text-[9px] font-mono text-zinc-500 text-left h-3 truncate">
+                        {showLabel ? week[0].monthLabel : ""}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex gap-2">
+                  {/* Day of week labels */}
+                  <div className="flex flex-col justify-between text-[9px] font-mono text-zinc-600 h-[104px] pt-1 select-none pr-1 w-4">
+                    <span>Su</span>
+                    <span>Tu</span>
+                    <span>Th</span>
+                    <span>Sa</span>
+                  </div>
+
+                  {/* Grid cells */}
+                  <div className="grid grid-flow-col grid-rows-7 gap-1 flex-1">
+                    {heatmapWeeks.flatMap((week, wIdx) => 
+                      week.map((day, dIdx) => {
+                        const isSelected = selectedHeatmapDay?.dateStr === day.dateStr;
+                        const score = day.urgeScore;
+                        
+                        // Pick background color based on score
+                        let bgClass = "bg-zinc-900 border-zinc-950 hover:bg-zinc-850 hover:border-zinc-700";
+                        if (score > 0) {
+                          if (score <= 4) bgClass = "bg-rose-950/40 border-rose-900/30 text-rose-300 hover:border-rose-500/50 hover:bg-rose-950/60";
+                          else if (score <= 8) bgClass = "bg-rose-900/40 border-rose-800/40 text-rose-200 hover:border-rose-500/70 hover:bg-rose-900/60";
+                          else if (score <= 14) bgClass = "bg-rose-700 border-rose-600/60 text-rose-100 hover:border-rose-400 hover:bg-rose-700";
+                          else bgClass = "bg-rose-500 border-rose-400 text-white shadow-[0_0_8px_rgba(244,63,94,0.5)] hover:bg-rose-400 hover:border-rose-300";
+                        }
+                        
+                        if (isSelected) {
+                          bgClass = "bg-rose-500 border-2 border-white ring-2 ring-rose-500/40 scale-110 z-10 shadow-[0_0_12px_rgba(244,63,94,0.8)] text-white";
+                        }
+
+                        return (
+                          <button
+                            key={`${wIdx}-${dIdx}`}
+                            onClick={() => setSelectedHeatmapDay(day)}
+                            className={`aspect-square rounded-[3px] md:rounded-md border transition cursor-pointer flex items-center justify-center relative ${bgClass}`}
+                            title={`${day.dateStr}: ${day.urges.length} urges (Total Intensity: ${score})`}
+                          >
+                            {/* Minor indication dot if today */}
+                            {day.dateStr === todayStr && !isSelected && (
+                              <span className="absolute -top-[1.5px] -right-[1.5px] w-1.5 h-1.5 rounded-full bg-[#ccff00] ring-1 ring-black" />
+                            )}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* Legend and Info Row */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2 text-[10px] font-mono border-t border-zinc-900/60">
+                  <div className="flex items-center gap-1.5 text-zinc-500">
+                    <span>Calm</span>
+                    <span className="w-2.5 h-2.5 rounded-[2px] bg-zinc-900 border border-zinc-850" />
+                    <span className="w-2.5 h-2.5 rounded-[2px] bg-rose-950/40 border border-rose-900/30" />
+                    <span className="w-2.5 h-2.5 rounded-[2px] bg-rose-900/40 border border-rose-800/40" />
+                    <span className="w-2.5 h-2.5 rounded-[2px] bg-rose-700 border border-rose-600/60" />
+                    <span className="w-2.5 h-2.5 rounded-[2px] bg-rose-500 border border-rose-400" />
+                    <span>Severe</span>
+                  </div>
+                  <span className="text-zinc-500 italic">Select any cell to inspect logs</span>
+                </div>
+              </div>
+
+              {/* Heatmap Selected Day Details Inspector */}
+              <AnimatePresence mode="wait">
+                {selectedHeatmapDay && (
+                  <motion.div
+                    key={selectedHeatmapDay.dateStr}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="p-4 bg-zinc-900/30 border border-zinc-900 rounded-2xl space-y-4"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-900/60 pb-2.5">
+                      <div>
+                        <span className="text-[10px] font-mono text-[#ccff00] font-bold block uppercase tracking-wider">
+                          Heatmap Inspector
+                        </span>
+                        <h4 className="text-sm font-bold text-white font-mono flex items-center gap-1.5">
+                          {new Date(selectedHeatmapDay.dateStr).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                        </h4>
+                      </div>
+                      
+                      {/* Check-in verification indicator */}
+                      <div className="flex items-center gap-1.5 text-[10px] font-mono">
+                        {selectedHeatmapDay.entry ? (
+                          <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-md flex items-center gap-1 font-bold">
+                            🔒 Locked & Verified (Day {selectedHeatmapDay.entry.dayNumber})
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 bg-zinc-900 border border-zinc-850 text-zinc-500 rounded-md">
+                            No verification entry
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Stats metrics */}
+                    <div className="grid grid-cols-3 gap-2.5">
+                      <div className="bg-zinc-950/60 border border-zinc-900 p-2.5 rounded-xl text-center">
+                        <span className="text-[9px] font-mono text-zinc-500 uppercase block">Total Urges</span>
+                        <span className="text-lg font-bold font-mono text-white block mt-0.5">
+                          {selectedHeatmapDay.urges.length}
+                        </span>
+                      </div>
+                      <div className="bg-zinc-950/60 border border-zinc-900 p-2.5 rounded-xl text-center">
+                        <span className="text-[9px] font-mono text-zinc-500 uppercase block">Max Intensity</span>
+                        <span className="text-lg font-bold font-mono text-rose-400 block mt-0.5">
+                          {selectedHeatmapDay.maxIntensity > 0 ? `${selectedHeatmapDay.maxIntensity}/10` : "0/10"}
+                        </span>
+                      </div>
+                      <div className="bg-zinc-950/60 border border-zinc-900 p-2.5 rounded-xl text-center">
+                        <span className="text-[9px] font-mono text-zinc-500 uppercase block">Total Score</span>
+                        <span className="text-lg font-bold font-mono text-[#ccff00] block mt-0.5">
+                          {selectedHeatmapDay.urgeScore}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Urges chronology for selected day */}
+                    <div className="space-y-3">
+                      <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest block">
+                        Chronology Logs
+                      </span>
+
+                      {selectedHeatmapDay.urges.length === 0 ? (
+                        <div className="text-center py-4 px-3 bg-zinc-950/20 border border-zinc-900/40 rounded-xl space-y-1">
+                          <CheckCircle2 className="w-5 h-5 text-[#ccff00] mx-auto opacity-70" />
+                          <p className="text-xs text-zinc-300 font-bold font-mono">No urge events recorded</p>
+                          <p className="text-[10px] text-zinc-500 font-mono leading-normal max-w-xs mx-auto">
+                            The mind remained completely stable, clear, and in absolute discipline. Focus baseline secure!
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                          {selectedHeatmapDay.urges.map((urge: any, idx: number) => (
+                            <div
+                              key={urge.id || idx}
+                              className="p-3 bg-zinc-950 border border-zinc-900/80 rounded-xl space-y-2 hover:border-zinc-800 transition"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <ShieldAlert className="w-4 h-4 text-rose-400" />
+                                  <span className="text-xs font-bold text-white font-mono">
+                                    Urge Event #{idx + 1}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px] font-mono text-zinc-500">
+                                    {new Date(urge.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                  <span className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono border ${
+                                    urge.intensity >= 7 
+                                      ? "bg-rose-500/10 border-rose-500/30 text-rose-400" 
+                                      : "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                                  }`}>
+                                    Intensity {urge.intensity}/10
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-zinc-400 bg-zinc-900/30 px-2 py-1.5 rounded-lg border border-zinc-900/40">
+                                <span>Trigger: <strong className="text-white">{urge.trigger}</strong></span>
+                                <span className="text-right">Duration: <strong className="text-white">{urge.durationMinutes} min</strong></span>
+                              </div>
+
+                              {urge.journal && (
+                                <p className="text-xs text-zinc-300 font-sans italic leading-relaxed pl-2 border-l border-zinc-800">
+                                  "{urge.journal}"
+                                </p>
+                              )}
+
+                              <div className="flex items-center justify-between pt-1 border-t border-zinc-900/50 text-[10px] font-mono text-zinc-500">
+                                <span>Status: <strong className={urge.resolved ? "text-emerald-400" : "text-amber-400"}>
+                                  {urge.resolved ? "✓ Resolved Securely" : "Active / Restless"}
+                                </strong></span>
+                                <span>Support: <strong className="text-zinc-400">Breathing Anchor</strong></span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Display daily reflection journal if present */}
+                      {selectedHeatmapDay.entry?.journalText && (
+                        <div className="p-3 bg-[#ccff00]/5 border border-[#ccff00]/10 rounded-xl space-y-1">
+                          <span className="text-[9px] font-mono font-bold text-[#ccff00] uppercase tracking-wider block">
+                            Daily Reflection Memoir Journal
+                          </span>
+                          <p className="text-xs text-zinc-300 italic font-sans leading-relaxed">
+                            "{selectedHeatmapDay.entry.journalText}"
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
             {/* History Calendar Grid */}
             <div className="bg-zinc-950 border border-zinc-900 rounded-[28px] p-6">
               <div className="flex justify-between items-center mb-6">
